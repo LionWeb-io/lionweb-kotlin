@@ -43,6 +43,12 @@ class LionWebClient(
     val clientID: String = "GenericKotlinBasedLionWebClient",
     val repository: String = "default",
 ) {
+    var nodeIDTranslator: NodeIDTranslator?
+        get() = requestsBroker.nodeIDTranslator
+        set(value) {
+            requestsBroker.nodeIDTranslator = value
+        }
+
     // Fields
 
     private val requestsBroker =
@@ -640,7 +646,15 @@ class LionWebClient(
             throw RuntimeException("Request failed. Messages: $messages")
         }
         val chunkJson = json.get("chunk")
+        nodeIDTranslationForChunk(chunkJson)
         return chunkProcessor.invoke(chunkJson)
+    }
+
+    private fun nodeIDTranslationForChunk(chunkJson: JsonElement) {
+        if (nodeIDTranslator == null) {
+            return
+        }
+        TODO()
     }
 }
 
