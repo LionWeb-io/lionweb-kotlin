@@ -32,6 +32,8 @@ import kotlin.reflect.KProperty
 // Integer.MAX_VALUE       =         2,147,483,647
 val MAX_DEPTH = Integer.MAX_VALUE
 
+typealias SerializationDecorator = (JsonSerialization) -> Unit
+
 class LionWebClient(
     val hostname: String = "localhost",
     val port: Int = 3005,
@@ -43,7 +45,10 @@ class LionWebClient(
     val clientID: String = "GenericKotlinBasedLionWebClient",
     val repository: String = "default",
 ) {
+
     // Fields
+    private val languages = mutableListOf<Language>()
+    private val serializationDecorators = mutableListOf<SerializationDecorator>()
 
     private val lowLevelRepoClient =
         LowLevelRepoClient(
@@ -69,17 +74,31 @@ class LionWebClient(
     val jsonSerialization: JsonSerialization
         get() {
             val jsonSerialization = jsonSerializationProvider?.invoke() ?: defaultJsonSerialization
+            serializationDecorators.forEach { serializationDecorator -> serializationDecorator.invoke(jsonSerialization) }
+            return jsonSerialization
+        }
+    init {
+        registerSerializationDecorator { jsonSerialization ->
             languages.forEach {
                 jsonSerialization.registerLanguage(it)
             }
             MetamodelRegistry.prepareJsonSerialization(jsonSerialization)
-            return jsonSerialization
         }
+    }
+
 
     // Configuration
 
     fun registerLanguage(language: Language) {
         languages.add(language)
+    }
+
+    fun registerSerializationDecorator(decorator: SerializationDecorator) {
+        serializationDecorators.add(decorator)
+    }
+
+    fun cleanSerializationDecorators() {
+        serializationDecorators.clear()
     }
 
     // Setup
@@ -555,8 +574,6 @@ class LionWebClient(
     }
 
     // Private methods
-
-    private val languages = mutableListOf<Language>()
 
     private fun log(message: String) {
         if (debug) {
