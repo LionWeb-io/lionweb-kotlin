@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit
  * This is a low-level client for the LW Repo. It just does the requests, without any preparation or safe-guard.
  * Users of this library should use LionWebClient, which will delegate to this class.
  */
-internal class RequestsBroker(
+internal class LowLevelRepoClient(
     val hostname: String = "localhost",
     val port: Int = 3005,
     val authorizationToken: String? = null,
@@ -30,7 +30,6 @@ internal class RequestsBroker(
     val connectTimeOutInSeconds: Long = 60,
     val callTimeoutInSeconds: Long = 60,
     val debug: Boolean = false,
-    var nodeIDTranslator: NodeIDTranslator? = null
 ) {
     fun createRepository(history: Boolean = false) {
         val url = "http://$hostname:$port/createRepository?history=$history"
@@ -47,16 +46,8 @@ internal class RequestsBroker(
         }
     }
 
-    private fun translateNodeID(originalNodeID: String) : String {
-        return nodeIDTranslator?.toTranslatedNodeID(originalNodeID) ?: originalNodeID
-    }
-
-    private fun originalNodeID(translatedNodeID: String) : String {
-        return nodeIDTranslator?.toOriginalNodeID(translatedNodeID) ?: translatedNodeID
-    }
-
     fun deletePartition(nodeID: String) {
-        val body: RequestBody = "[\"${translateNodeID(nodeID)}\"]".toRequestBody(JSON)
+        val body: RequestBody = "[\"${nodeID}\"]".toRequestBody(JSON)
         val request: Request =
             Request.Builder()
                 .url("http://$hostname:$port/bulk/deletePartitions".addClientIdQueryParam())
@@ -101,7 +92,7 @@ internal class RequestsBroker(
     ): String {
         require(rootIds.isNotEmpty())
         require(rootIds.all { it.isNotBlank() })
-        val body: RequestBody = "{\"ids\":[${rootIds.map { translateNodeID(it) }.joinToString(", "){"\"$it\""}}] }".toRequestBody(JSON)
+        val body: RequestBody = "{\"ids\":[${rootIds.joinToString(", "){"\"$it\""}}] }".toRequestBody(JSON)
         val url = "http://$hostname:$port/bulk/retrieve"
         val urlBuilder = url.toHttpUrlOrNull()!!.newBuilder()
         urlBuilder.addQueryParameter("depthLimit", limit.toString())
@@ -147,7 +138,7 @@ internal class RequestsBroker(
             val result = mutableMapOf<ClassifierKey, ClassifierResult>()
             data.asJsonArray.map { it.asJsonObject }.forEach { entry ->
                 val classifierKey = ClassifierKey(entry["language"].asString, entry["classifier"].asString)
-                val ids: Set<String> = entry["ids"].asJsonArray.map { originalNodeID(it.asString) }.toSet()
+                val ids: Set<String> = entry["ids"].asJsonArray.map { it.asString }.toSet()
                 result[classifierKey] = ClassifierResult(ids, entry["size"].asInt)
             }
             return result

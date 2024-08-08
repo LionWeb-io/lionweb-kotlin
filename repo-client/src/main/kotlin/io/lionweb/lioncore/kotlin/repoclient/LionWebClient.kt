@@ -43,16 +43,10 @@ class LionWebClient(
     val clientID: String = "GenericKotlinBasedLionWebClient",
     val repository: String = "default",
 ) {
-    var nodeIDTranslator: NodeIDTranslator?
-        get() = requestsBroker.nodeIDTranslator
-        set(value) {
-            requestsBroker.nodeIDTranslator = value
-        }
-
     // Fields
 
-    private val requestsBroker =
-        RequestsBroker(
+    private val lowLevelRepoClient =
+        LowLevelRepoClient(
             hostname = hostname,
             port = port,
             authorizationToken = authorizationToken,
@@ -91,7 +85,7 @@ class LionWebClient(
     // Setup
 
     fun createRepository(history: Boolean = false) {
-        requestsBroker.createRepository(history)
+        lowLevelRepoClient.createRepository(history)
     }
 
     // Partitions
@@ -108,11 +102,11 @@ class LionWebClient(
     }
 
     fun deletePartition(nodeID: String) {
-        requestsBroker.deletePartition(nodeID)
+        lowLevelRepoClient.deletePartition(nodeID)
     }
 
     fun getPartitionIDs(): List<String> {
-        val data = requestsBroker.getPartitionIDs()
+        val data = lowLevelRepoClient.getPartitionIDs()
         return processChunkResponse(data) {
             val chunk = LowLevelJsonSerialization().deserializeSerializationBlock(it)
             chunk.classifierInstances.mapNotNull { it.id }
@@ -145,7 +139,7 @@ class LionWebClient(
                 RetrievalMode.SINGLE_NODE -> 1
                 RetrievalMode.ENTIRE_SUBTREE -> MAX_DEPTH
             }
-        val data = requestsBroker.retrieve(rootIds, limit)
+        val data = lowLevelRepoClient.retrieve(rootIds, limit)
 
         return processChunkResponse(data) {
             val js = jsonSerialization
@@ -210,7 +204,7 @@ class LionWebClient(
     fun isNodeExisting(nodeID: String): Boolean {
         require(nodeID.isNotBlank())
 
-        val data = requestsBroker.retrieve(listOf(nodeID), limit = 0)
+        val data = lowLevelRepoClient.retrieve(listOf(nodeID), limit = 0)
         return processChunkResponse(data) { chunk ->
             val nodes = chunk.asJsonObject.get("nodes").asJsonArray
             !nodes.isEmpty
@@ -219,7 +213,7 @@ class LionWebClient(
 
     fun getParentId(nodeID: String): String? {
         require(nodeID.isNotBlank())
-        val data = requestsBroker.retrieve(listOf(nodeID), limit = 0)
+        val data = lowLevelRepoClient.retrieve(listOf(nodeID), limit = 0)
         return processChunkResponse(data) { chunk ->
             val nodes = chunk.asJsonObject.get("nodes").asJsonArray
             if (nodes.size() != 1) {
@@ -447,7 +441,7 @@ class LionWebClient(
     }
 
     fun nodesByClassifier(limit: Int? = null): Map<ClassifierKey, ClassifierResult> {
-        return requestsBroker.nodesByClassifier(limit = limit)
+        return lowLevelRepoClient.nodesByClassifier(limit = limit)
     }
 
     fun childrenInContainment(
@@ -486,7 +480,7 @@ class LionWebClient(
         nodeIDs: List<String>,
         depthLimit: Int? = null,
     ): List<NodeInfo> {
-        return requestsBroker.nodeTree(nodeIDs, depthLimit)
+        return lowLevelRepoClient.nodeTree(nodeIDs, depthLimit)
     }
 
     private fun bulkImportUsingJson(
@@ -511,7 +505,7 @@ class LionWebClient(
         body.add("attachPoints", bodyAttachPoints)
         body.add("nodes", bodyNodes)
         val bodyJson = Gson().toJson(body)
-        return requestsBroker.bulkImportUsingJson(bodyJson, compress = compress)
+        return lowLevelRepoClient.bulkImportUsingJson(bodyJson, compress = compress)
     }
 
     private fun bulkImportUsingProtobuf(
@@ -528,7 +522,7 @@ class LionWebClient(
                 this.instantiator = jsonSerialization.instantiator
                 this.primitiveValuesSerialization = jsonSerialization.primitiveValuesSerialization
             }.serializeBulkImport(bulkImport).toByteArray()
-        requestsBroker.bulkImportUsingProtobuf(bytes, compress = compress)
+        lowLevelRepoClient.bulkImportUsingProtobuf(bytes, compress = compress)
     }
 
     private fun bulkImportUsingFlatBuffers(
@@ -545,7 +539,7 @@ class LionWebClient(
                 this.instantiator = jsonSerialization.instantiator
                 this.primitiveValuesSerialization = jsonSerialization.primitiveValuesSerialization
             }.serializeBulkImport(bulkImport)
-        requestsBroker.bulkImportUsingFlatBuffers(bytes, compress = compress)
+        lowLevelRepoClient.bulkImportUsingFlatBuffers(bytes, compress = compress)
     }
 
     fun bulkImport(
@@ -590,7 +584,7 @@ class LionWebClient(
 
         val json = jsonSerialization.serializeNodesToJsonString(nodes)
 
-        requestsBroker.nodesStoringOperation(json, operation)
+        lowLevelRepoClient.nodesStoringOperation(json, operation)
     }
 
     private fun treeStoringOperation(
@@ -622,7 +616,7 @@ class LionWebClient(
         val json = jsonSerialization.serializeTreesToJsonString(node)
         debugFile("sent.json") { json }
 
-        requestsBroker.nodesStoringOperation(json, operation)
+        lowLevelRepoClient.nodesStoringOperation(json, operation)
     }
 
     private fun debugFile(
@@ -646,15 +640,7 @@ class LionWebClient(
             throw RuntimeException("Request failed. Messages: $messages")
         }
         val chunkJson = json.get("chunk")
-        nodeIDTranslationForChunk(chunkJson)
         return chunkProcessor.invoke(chunkJson)
-    }
-
-    private fun nodeIDTranslationForChunk(chunkJson: JsonElement) {
-        if (nodeIDTranslator == null) {
-            return
-        }
-        TODO()
     }
 }
 
