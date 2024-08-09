@@ -45,7 +45,6 @@ class LionWebClient(
     val clientID: String = "GenericKotlinBasedLionWebClient",
     val repository: String = "default",
 ) {
-
     // Fields
     private val languages = mutableListOf<Language>()
     private val serializationDecorators = mutableListOf<SerializationDecorator>()
@@ -70,13 +69,6 @@ class LionWebClient(
             enableDynamicNodes()
         }
 
-    // TODO avoid re-instantiating jsonSerialization a ton of times
-    val jsonSerialization: JsonSerialization
-        get() {
-            val jsonSerialization = jsonSerializationProvider?.invoke() ?: defaultJsonSerialization
-            serializationDecorators.forEach { serializationDecorator -> serializationDecorator.invoke(jsonSerialization) }
-            return jsonSerialization
-        }
     init {
         registerSerializationDecorator { jsonSerialization ->
             languages.forEach {
@@ -86,8 +78,22 @@ class LionWebClient(
         }
     }
 
+    var jsonSerialization: JsonSerialization = calculateJsonSerialization()
+        private set(value) {
+            field = value
+        }
 
     // Configuration
+
+    private fun calculateJsonSerialization(): JsonSerialization {
+        val jsonSerialization = jsonSerializationProvider?.invoke() ?: defaultJsonSerialization
+        serializationDecorators.forEach { serializationDecorator -> serializationDecorator.invoke(jsonSerialization) }
+        return jsonSerialization
+    }
+
+    fun updateJsonSerialization() {
+        this.jsonSerialization = calculateJsonSerialization()
+    }
 
     fun registerLanguage(language: Language) {
         languages.add(language)

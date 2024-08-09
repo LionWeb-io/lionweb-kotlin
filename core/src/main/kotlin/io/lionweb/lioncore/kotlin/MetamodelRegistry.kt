@@ -8,7 +8,8 @@ import io.lionweb.lioncore.java.language.Property
 import io.lionweb.lioncore.java.model.ClassifierInstance
 import io.lionweb.lioncore.java.model.Node
 import io.lionweb.lioncore.java.model.impl.DynamicNode
-import io.lionweb.lioncore.java.serialization.JsonSerialization
+import io.lionweb.lioncore.java.serialization.AbstractSerialization
+import io.lionweb.lioncore.java.serialization.Instantiator
 import io.lionweb.lioncore.java.serialization.PrimitiveValuesSerialization
 import io.lionweb.lioncore.java.serialization.data.SerializedClassifierInstance
 import kotlin.reflect.KClass
@@ -70,9 +71,9 @@ object MetamodelRegistry {
 
     fun getPrimitiveType(kClass: KClass<*>): PrimitiveType? = classToPrimitiveType[kClass]
 
-    fun prepareJsonSerialization(jsonSerialization: JsonSerialization) {
+    fun prepareInstantiator(instantiator: Instantiator) {
         classToClassifier.forEach { (kClass, concept) ->
-            jsonSerialization.instantiator.registerCustomDeserializer(concept.id!!) {
+            instantiator.registerCustomDeserializer(concept.id!!) {
                     classifier: Classifier<*>,
                     serializedClassifierInstance: SerializedClassifierInstance,
                     nodes: MutableMap<String, ClassifierInstance<*>>,
@@ -85,15 +86,23 @@ object MetamodelRegistry {
                 result
             }
         }
+    }
+
+    fun preparePrimitiveValuesSerialization(primitiveValuesSerialization: PrimitiveValuesSerialization) {
         classToPrimitiveType.forEach { (kClass, primitiveType) ->
             val serializer = serializers[primitiveType]
             val deserializer = deserializers[primitiveType]
             if (serializer != null) {
-                jsonSerialization.primitiveValuesSerialization.registerSerializer(primitiveType.id, serializer)
+                primitiveValuesSerialization.registerSerializer(primitiveType.id, serializer)
             }
             if (deserializer != null) {
-                jsonSerialization.primitiveValuesSerialization.registerDeserializer(primitiveType.id, deserializer)
+                primitiveValuesSerialization.registerDeserializer(primitiveType.id, deserializer)
             }
         }
+    }
+
+    fun prepareJsonSerialization(serialization: AbstractSerialization) {
+        prepareInstantiator(serialization.instantiator)
+        preparePrimitiveValuesSerialization(serialization.primitiveValuesSerialization)
     }
 }
