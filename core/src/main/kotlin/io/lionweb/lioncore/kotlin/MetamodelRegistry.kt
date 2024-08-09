@@ -89,15 +89,11 @@ object MetamodelRegistry {
     }
 
     fun preparePrimitiveValuesSerialization(primitiveValuesSerialization: PrimitiveValuesSerialization) {
-        classToPrimitiveType.forEach { (kClass, primitiveType) ->
-            val serializer = serializers[primitiveType]
-            val deserializer = deserializers[primitiveType]
-            if (serializer != null) {
-                primitiveValuesSerialization.registerSerializer(primitiveType.id, serializer)
-            }
-            if (deserializer != null) {
-                primitiveValuesSerialization.registerDeserializer(primitiveType.id, deserializer)
-            }
+        serializers.forEach { primitiveType, serializer ->
+            primitiveValuesSerialization.registerSerializer(primitiveType.id, serializer)
+        }
+        deserializers.forEach { primitiveType, deserializer ->
+            primitiveValuesSerialization.registerDeserializer(primitiveType.id, deserializer)
         }
     }
 
