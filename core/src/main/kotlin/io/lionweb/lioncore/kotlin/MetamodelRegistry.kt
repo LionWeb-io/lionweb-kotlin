@@ -74,10 +74,10 @@ object MetamodelRegistry {
     fun prepareInstantiator(instantiator: Instantiator) {
         classToClassifier.forEach { (kClass, concept) ->
             instantiator.registerCustomDeserializer(concept.id!!) {
-                    classifier: Classifier<*>,
+                    _: Classifier<*>,
                     serializedClassifierInstance: SerializedClassifierInstance,
-                    nodes: MutableMap<String, ClassifierInstance<*>>,
-                    propertyValues: MutableMap<Property, Any>,
+                    _: MutableMap<String, ClassifierInstance<*>>,
+                    _: MutableMap<Property, Any>,
                 ->
                 val result = kClass.primaryConstructor!!.callBy(emptyMap()) as Node
                 if (result is DynamicNode) {

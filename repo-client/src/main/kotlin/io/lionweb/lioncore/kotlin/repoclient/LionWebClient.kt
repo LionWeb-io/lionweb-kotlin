@@ -79,9 +79,7 @@ class LionWebClient(
     }
 
     var jsonSerialization: JsonSerialization = calculateJsonSerialization()
-        private set(value) {
-            field = value
-        }
+        private set
 
     // Configuration
 
