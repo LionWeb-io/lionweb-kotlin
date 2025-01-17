@@ -95,6 +95,7 @@ java {
 tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile::class).all {
     kotlinOptions {
         jvmTarget = jvmVersion
+        freeCompilerArgs += "-Xcontext-receivers"
     }
 }
 

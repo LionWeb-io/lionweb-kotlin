@@ -145,6 +145,7 @@ fun Language.createConcepts(vararg conceptClasses: KClass<out Node>) {
         conceptClass.superclasses.forEach { superClass ->
             when {
                 superClass == BaseNode::class -> Unit // Nothing to do
+                superClass == ADPBaseNode::class -> Unit // Nothing to do
                 superClass.java.isInterface -> Unit
                 else -> {
                     val extendedConcept = conceptsByClasses[superClass]
