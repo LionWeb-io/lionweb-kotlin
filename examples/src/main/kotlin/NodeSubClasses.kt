@@ -61,5 +61,3 @@ class TextFile() : File() {
     val numberOfLines: Int?
         get() = contents?.lines()?.size
 }
-
-

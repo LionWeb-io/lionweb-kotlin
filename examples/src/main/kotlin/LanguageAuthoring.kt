@@ -24,5 +24,7 @@ val propertiesLanguage =
 
 fun main(args: Array<String>) {
     // Save the language to file
-    File("properties-language.json").writeText(SerializationProvider.getStandardJsonSerialization().serializeTreesToJsonString(propertiesLanguage))
+    File(
+        "properties-language.json",
+    ).writeText(SerializationProvider.getStandardJsonSerialization().serializeTreesToJsonString(propertiesLanguage))
 }
