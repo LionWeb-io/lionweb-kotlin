@@ -17,6 +17,8 @@ import io.lionweb.lioncore.kotlin.getReferenceValueByName
 import io.lionweb.lioncore.kotlin.setPropertyValueByName
 import io.lionweb.lioncore.kotlin.setReferenceValuesByName
 import io.lionweb.repoclient.ExtendedLionWebRepoClient
+import io.lionweb.repoclient.api.ClassifierKey
+import io.lionweb.repoclient.api.ClassifierResult
 import io.lionweb.repoclient.api.HistorySupport
 import io.lionweb.repoclient.api.RepositoryConfiguration
 import io.lionweb.serialization.extensions.BulkImport
@@ -43,20 +45,6 @@ class LionWebClient(
     val repository: String = "default",
     val lionWebVersion: LionWebVersion = LionWebVersion.currentVersion,
 ) {
-    @Deprecated("We should use jRepoClient instead")
-    private val lowLevelRepoClient =
-        LowLevelRepoClient(
-            hostname = hostname,
-            port = port,
-            authorizationToken = authorizationToken,
-            clientID = clientID,
-            repository = repository,
-            connectTimeOutInSeconds = connectTimeOutInSeconds,
-            callTimeoutInSeconds = callTimeoutInSeconds,
-            debug = debug,
-            lionWebVersion = lionWebVersion,
-        )
-
     private val jRepoClient =
         ExtendedLionWebRepoClient(
             lionWebVersion,
@@ -75,7 +63,7 @@ class LionWebClient(
     // Configuration
 
     fun registerLanguage(language: Language) {
-        jRepoClient.jsonSerialization.registerLanguage(language)
+        jsonSerialization.registerLanguage(language)
     }
 
     // Setup
@@ -195,7 +183,7 @@ class LionWebClient(
     fun isNodeExisting(nodeID: String): Boolean {
         require(nodeID.isNotBlank())
 
-        val data = lowLevelRepoClient.retrieve(listOf(nodeID), limit = 0)
+        val data = jRepoClient.rawRetrieve(listOf(nodeID), 0)
         return processChunkResponse(data) { chunk ->
             val nodes = chunk.asJsonObject.get("nodes").asJsonArray
             !nodes.isEmpty
@@ -204,7 +192,7 @@ class LionWebClient(
 
     fun getParentId(nodeID: String): String? {
         require(nodeID.isNotBlank())
-        val data = lowLevelRepoClient.retrieve(listOf(nodeID), limit = 0)
+        val data = jRepoClient.rawRetrieve(listOf(nodeID), 0)
         return processChunkResponse(data) { chunk ->
             val nodes = chunk.asJsonObject.get("nodes").asJsonArray
             if (nodes.size() != 1) {
@@ -225,7 +213,7 @@ class LionWebClient(
         }
     }
 
-    fun listRepositiories(): Set<RepositoryConfiguration> {
+    fun listRepositories(): Set<RepositoryConfiguration> {
         return jRepoClient.listRepositories()
     }
 
@@ -450,7 +438,7 @@ class LionWebClient(
     }
 
     fun nodesByClassifier(limit: Int? = null): Map<ClassifierKey, ClassifierResult> {
-        return lowLevelRepoClient.nodesByClassifier(limit = limit)
+        return jRepoClient.nodesByClassifier(limit)
     }
 
     fun childrenInContainment(
