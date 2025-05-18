@@ -4,6 +4,7 @@ import io.lionweb.lioncore.java.LionWebVersion
 import io.lionweb.lioncore.java.model.ClassifierInstanceUtils
 import io.lionweb.lioncore.kotlin.dynamicNode
 import io.lionweb.lioncore.kotlin.setPropertyValueByName
+import io.lionweb.repoclient.api.ClassifierKey
 import io.lionweb.repoclient.testing.AbstractRepoClientFunctionalTest
 import io.lionweb.serialization.extensions.NodeInfo
 import org.junit.jupiter.api.assertThrows
@@ -202,7 +203,7 @@ class PropertiesFunctionalTest : AbstractRepoClientFunctionalTest() {
                 setPropertyValueByName("name", "Prop3")
                 pf.addChild(pf.classifier.getContainmentByName("properties")!!, this)
             }
-        val repos = client.listRepositiories()
+        val repos = client.listRepositories()
         client.storeTree(pp1)
 
         val prop3retrievedWithProxyParent = client.retrieve("prop3")

@@ -500,16 +500,7 @@ class LionWebClient(
         data: String,
         chunkProcessor: (JsonElement) -> T,
     ): T {
-        val json = JsonParser.parseString(data).asJsonObject
-        val success = json.get("success").asBoolean
-        val messages = json.get("messages").asJsonArray
-        if (!messages.isEmpty) {
-            log("Messages received: $messages")
-        }
-        if (!success) {
-            throw RuntimeException("Request failed. Messages: $messages")
-        }
-        val chunkJson = json.get("chunk")
+        val chunkJson = JsonParser.parseString(data).asJsonObject
         return chunkProcessor.invoke(chunkJson)
     }
 }
