@@ -33,6 +33,7 @@ dependencies {
     implementation(libs.lwjava.core)
     implementation(libs.kotlinpoet)
     implementation(libs.clikt)
+    implementation(libs.starlasu.specs)
 }
 
 val specsVersion: String by project

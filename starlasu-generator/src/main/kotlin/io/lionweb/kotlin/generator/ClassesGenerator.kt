@@ -22,6 +22,7 @@ import io.lionweb.serialization.JsonSerialization
 import io.lionweb.serialization.ProtoBufSerialization
 import io.lionweb.serialization.SerializationProvider
 import java.io.File
+import com.strumenta.starlasu.base.v1.ASTLanguageV1
 
 class ClassesGeneratorCommand : CliktCommand("classgen") {
     val dependenciesFiles: List<File> by option("--dependency", help = "Dependency file to generate classes for")
@@ -35,7 +36,7 @@ class ClassesGeneratorCommand : CliktCommand("classgen") {
         .default(File("out"))
     val lwVersion : LionWebVersion by option("--lwversion", help = "LionWeb version to generate classes for")
         .enum<LionWebVersion>(ignoreCase = true)
-        .default(LionWebVersion.currentVersion)
+        .default(LionWebVersion.v2023_1)
 
     override fun run() {
         val extensions = (languageFiles.map { it.extension } + dependenciesFiles.map { it.extension }).toSet()
@@ -48,6 +49,7 @@ class ClassesGeneratorCommand : CliktCommand("classgen") {
             "pb" -> SerializationProvider.getStandardProtoBufSerialization(lwVersion)
             else -> throw IllegalArgumentException("Unsupported language extension: $extension")
         }
+        serialization.registerLanguage(ASTLanguageV1.getLanguage())
         fun loadLanguage(file: File): Language {
             val language = when (serialization) {
                 is ProtoBufSerialization -> {
@@ -106,6 +108,7 @@ class ClassesGeneratorCommand : CliktCommand("classgen") {
         }
         if (concept.extendedConcept != null) {
             when (val superConcept = concept.extendedConcept) {
+                ASTLanguageV1.getASTNode() -> TODO()
                 else -> TODO()
             }
         }
