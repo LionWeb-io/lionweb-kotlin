@@ -1,6 +1,6 @@
 [versions]
 kotlinVersion="2.0.21"
-lwJavaVersion="1.1.2"
+lwJavaVersion="1.1.4"
 kotestVersion="5.9.1"
 testcontainersVersion="1.21.3"
 
@@ -28,3 +28,5 @@ testcontainers =  { module="org.testcontainers:testcontainers", version.ref = "t
 testcontainers-junit = { module="org.testcontainers:junit-jupiter", version.ref = "testcontainersVersion" }
 testcontainers-pg = { module="org.testcontainers:postgresql", version.ref = "testcontainersVersion" }
 protobuf = { module="com.google.protobuf:protobuf-java", version = "4.30.2" }
+kotlinpoet = { module="com.squareup:kotlinpoet", version = "2.2.0" }
+clikt = { module = "com.github.ajalt.clikt:clikt", version = "5.0.3" }
