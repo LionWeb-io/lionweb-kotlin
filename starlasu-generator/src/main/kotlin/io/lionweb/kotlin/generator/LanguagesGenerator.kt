@@ -19,6 +19,7 @@ import io.lionweb.language.Containment
 import io.lionweb.language.Enumeration
 import io.lionweb.language.Interface
 import io.lionweb.language.Language
+import io.lionweb.language.LionCoreBuiltins
 import io.lionweb.language.PrimitiveType
 import io.lionweb.language.Property
 import io.lionweb.language.Reference
@@ -184,6 +185,7 @@ class LanguagesGeneratorCommand : CliktCommand("langgen") {
                     langInit.addStatement("$varName.setKey(\"${classifier.key!!}\")")
                     langInit.addStatement("addElement($varName)")
                 }
+
                 is Interface -> {
                     langClassBuilder.addProperty(varName, ClassName("io.lionweb.language", "Interface"))
                     langInit.addStatement("$varName = Interface()")
@@ -191,20 +193,172 @@ class LanguagesGeneratorCommand : CliktCommand("langgen") {
                     langInit.addStatement("$varName.setKey(\"${classifier.key!!}\")")
                     langInit.addStatement("addElement($varName)")
                 }
+
                 else -> throw IllegalArgumentException("Unsupported classifier type: ${classifier.javaClass.name}")
             }
-            classifier.features.forEach { feature ->
-                when (feature) {
-                    is Property -> {
-                        langInit.addStatement("${varName}.addProperty(\"${feature.name!!}\", ${feature.type!!.name!!})")
+        }
+        populateClassifiers(classifiers, langInit, langClassBuilder)
+    }
+
+        private fun populateClassifiers(
+            classifiers: List<Classifier<*>>,
+            langInit: CodeBlock.Builder,
+            langClassBuilder: TypeSpec.Builder
+        ) {
+            val sortedClassifiers = sortTopologically(classifiers.toSet())
+            sortedClassifiers.forEach { classifier ->
+                val varName = classifier.name!!.decapitalize()
+                classifier.features.forEach { feature ->
+                    when (feature) {
+                        is Property -> {
+                            if (feature.type!!.language == LionCoreBuiltins.getInstance(LionWebVersion.v2023_1)) {
+                                langInit.addStatement(
+                                    "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setType(%T.getInstance(LionWebVersion.v2023_1).getPrimitiveTypeByName(%S)))",
+                                    varName,
+                                    ClassName("io.lionweb.language", "Property"),
+                                    feature.id,
+                                    feature.key,
+                                    feature.name!!,
+                                    feature.isOptional,
+                                    ClassName("io.lionweb.language", "LionCoreBuiltins"),
+                                    feature.type!!.name!!
+                                )
+                            } else if (feature.type!!.language == ASTLanguageV1.getLanguage()) {
+                                langInit.addStatement(
+                                    "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setType(%T.getLanguage().getPrimitiveTypeByName(%S)))",
+                                    varName,
+                                    ClassName("io.lionweb.language", "Property"),
+                                    feature.id,
+                                    feature.key,
+                                    feature.name!!,
+                                    feature.isOptional,
+                                    ClassName("com.strumenta.starlasu.base.v1", "ASTLanguageV1"),
+                                    feature.type!!.name!!
+                                )
+                            } else {
+                                langInit.addStatement(
+                                    "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setType(%L))",
+                                    varName,
+                                    ClassName("io.lionweb.language", "Property"),
+                                    feature.id,
+                                    feature.key,
+                                    feature.name!!,
+                                    feature.isOptional,
+                                    feature.type!!.name!!.decapitalize()
+                                )
+                            }
+
+                        }
+
+                        is Containment -> {
+                            if (feature.type!!.language == LionCoreBuiltins.getInstance(LionWebVersion.v2023_1)) {
+                                TODO()
+                            } else if (feature.type!!.language == ASTLanguageV1.getLanguage()) {
+                                if (feature.type is Concept) {
+                                    langInit.addStatement(
+                                        "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setMultiple(%L).setType(%T.getLanguage().getConceptByName(%S)))",
+                                        varName,
+                                        ClassName("io.lionweb.language", "Containment"),
+                                        feature.id,
+                                        feature.key,
+                                        feature.name!!,
+                                        feature.isOptional,
+                                        feature.isMultiple,
+                                        ClassName("com.strumenta.starlasu.base.v1", "ASTLanguageV1"),
+                                        feature.type!!.name!!
+                                    )
+                                } else {
+                                    langInit.addStatement(
+                                        "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setMultiple(%L).setType(%T.getLanguage().getInterfaceByName(%S)))",
+                                        varName,
+                                        ClassName("io.lionweb.language", "Containment"),
+                                        feature.id,
+                                        feature.key,
+                                        feature.name!!,
+                                        feature.isOptional,
+                                        feature.isMultiple,
+                                        ClassName("com.strumenta.starlasu.base.v1", "ASTLanguageV1"),
+                                        feature.type!!.name!!
+                                    )
+                                }
+                            } else {
+                                langInit.addStatement(
+                                    "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setMultiple(%L).setType(%L))",
+                                    varName,
+                                    ClassName("io.lionweb.language", "Containment"),
+                                    feature.id,
+                                    feature.key,
+                                    feature.name!!,
+                                    feature.isOptional,
+                                    feature.isMultiple,
+                                    feature.type!!.name!!.decapitalize()
+                                )
+                            }
+                        }
+
+                        is Reference -> {
+                            if (feature.type!!.language == LionCoreBuiltins.getInstance(LionWebVersion.v2023_1)) {
+                                if (feature.type is Concept) {
+                                    langInit.addStatement(
+                                        "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setMultiple(%L).setType(%T.getInstance(LionWebVersion.v2023_1).getConceptByName(%S)))",
+                                        varName,
+                                        ClassName("io.lionweb.language", "Reference"),
+                                        feature.id,
+                                        feature.key,
+                                        feature.name!!,
+                                        feature.isOptional,
+                                        feature.isMultiple,
+                                        ClassName("io.lionweb.language", "LionCoreBuiltins"),
+                                        feature.type!!.name!!
+                                    )
+                                } else {
+                                    langInit.addStatement(
+                                        "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setMultiple(%L).setType(%T.getInstance(LionWebVersion.v2023_1).getInterfaceByName(%S)))",
+                                        varName,
+                                        ClassName("io.lionweb.language", "Reference"),
+                                        feature.id,
+                                        feature.key,
+                                        feature.name!!,
+                                        feature.isOptional,
+                                        feature.isMultiple,
+                                        ClassName("io.lionweb.language", "LionCoreBuiltins"),
+                                        feature.type!!.name!!
+                                    )
+                                }
+                            } else if (feature.type!!.language == ASTLanguageV1.getLanguage()) {
+                                langInit.addStatement(
+                                    "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setMultiple(%L).setType(%T.getLanguage().%L(%S)))",
+                                    varName,
+                                    ClassName("io.lionweb.language", "Reference"),
+                                    feature.id,
+                                    feature.key,
+                                    feature.name!!,
+                                    feature.isOptional,
+                                    feature.isMultiple,
+                                    if (feature.type is Concept) "getConceptByName" else "getInterfaceByName",
+                                    ClassName("com.strumenta.starlasu.base.v1", "ASTLanguageV1"),
+                                    feature.type!!.name!!
+                                )
+                            } else {
+                                langInit.addStatement(
+                                    "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setMultiple(%L).setType(%L))",
+                                    varName,
+                                    ClassName("io.lionweb.language", "Reference"),
+                                    feature.id,
+                                    feature.key,
+                                    feature.name!!,
+                                    feature.isOptional,
+                                    feature.isMultiple,
+                                    feature.type!!.name!!.decapitalize()
+                                )
+                            }
+                        }
+
+                        else -> TODO()
                     }
-                    is Containment -> {}
-                    is Reference -> {}
-                    else -> TODO()
                 }
             }
         }
-    }
 
     private fun save(fileSpec: FileSpec) {
         fileSpec.writeTo(outputDir)
