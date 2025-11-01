@@ -27,7 +27,9 @@ import io.lionweb.serialization.ProtoBufSerialization
 import io.lionweb.serialization.SerializationProvider
 import java.io.File
 import com.strumenta.starlasu.base.v1.ASTLanguageV1
+import io.lionweb.language.Classifier
 import io.lionweb.language.Containment
+import io.lionweb.language.Feature
 import io.lionweb.language.LionCoreBuiltins
 import io.lionweb.language.Property
 import io.lionweb.language.Reference
@@ -101,23 +103,149 @@ class ClassesGeneratorCommand : CliktCommand("classgen") {
                 is Enumeration -> generateEnumeration(element)
                 is Concept -> generateConcept(element, languageType)
                 is Interface -> generateInterface(element)
-                is PrimitiveType -> null
+                is PrimitiveType -> generatePrimitiveType(element)
                 else -> TODO("Not yet implemented for element type ${element::class.simpleName}")
             }
             fileSpec?.let { save(it) }
         }
     }
 
+    private fun generatePrimitiveType(primitiveType: PrimitiveType): FileSpec {
+        val packageName = primitiveType.language!!.name!!
+        val primitiveTypeClass = TypeSpec.classBuilder(primitiveType.name!!)
+            .primaryConstructor(
+                FunSpec.constructorBuilder()
+                    .addParameter("value", String::class)
+                    .build()
+            )
+            .addProperty(
+                PropertySpec.builder("value", String::class)
+                    .mutable(true) // makes it 'var'
+                    .initializer("value") // links property to constructor parameter
+                    .build()
+            )
+        return FileSpec.builder(packageName, primitiveType.name!!)
+            .addType(primitiveTypeClass.build())
+            .build()
+    }
+
     private fun save(fileSpec: FileSpec) {
         fileSpec.writeTo(outputDir)
     }
 
+    private fun generateFeature(typeSpec: TypeSpec.Builder, packageName: String, container: Classifier<*>, feature: Feature<*>, overridden: Boolean = false) {
+        when (feature) {
+            is Property -> {
+                val featureType = feature.type!!
+                val baseType : TypeName = when  {
+                    featureType.language == container.language -> ClassName(packageName, featureType.name!!)
+                    featureType == LionCoreBuiltins.getString(LionWebVersion.v2023_1) -> ClassName("kotlin", "String")
+                    featureType == LionCoreBuiltins.getInteger(LionWebVersion.v2023_1) -> ClassName("kotlin", "Int")
+                    featureType == LionCoreBuiltins.getBoolean(LionWebVersion.v2023_1) -> ClassName("kotlin", "Boolean")
+                    featureType == ASTLanguageV1.getChar() -> ClassName("kotlin", "Char")
+                    else -> TODO()
+                }
+                val prop = PropertySpec.builder(
+                    feature.name!!,
+                    baseType.copy(nullable = true)
+                ).mutable(true)
+                if (overridden) {
+                    prop.addModifiers(KModifier.OVERRIDE)
+                }
+                if (container is Concept) {
+                    prop.delegate("property(%S)", feature.name!!)
+                }
+                typeSpec.addProperty(prop.build())
+            }
+            is Reference -> {
+                val featureType = feature.type!!
+                val baseType : TypeName = when  {
+                    featureType.language == container.language -> ClassName(packageName, featureType.name!!)
+                    featureType == LionCoreBuiltins.getINamed(LionWebVersion.v2023_1) -> ClassName("com.strumenta.starlasulw", "NamedLW")
+                    else -> TODO()
+                }
+                if (feature.isMultiple) {
+
+
+                    val prop = PropertySpec.builder(feature.name!!,
+                        ClassName("kotlin.collections", "MutableList")
+                            .parameterizedBy(baseType)
+                    )
+                    if (container is Concept) {
+                        prop.initializer(
+                            "multipleReference<%T>(%S)",
+                            baseType,
+                            feature.name!!
+                        )
+                    }
+
+                    if (overridden) {
+                        prop.addModifiers(KModifier.OVERRIDE)
+                    }
+                    typeSpec.addProperty(prop.build())
+                } else {
+                    val prop = PropertySpec.builder(
+                        feature.name!!,
+                        ClassName("io.lionweb.kotlin", "SpecificReferenceValue")
+                            .parameterizedBy(baseType)
+                            .copy(nullable = true)
+                    )
+                    if (container is Concept) {
+                        prop.delegate("singleReference(%S)", feature.name!!)
+                    }
+                    if (overridden) {
+                        prop.addModifiers(KModifier.OVERRIDE)
+                    }
+                    typeSpec.addProperty(prop.build())
+                }
+            }
+            is Containment -> {
+                val featureType = feature.type!!
+                val baseType : TypeName = when  {
+                    featureType.language == container.language -> ClassName(packageName, featureType.name!!)
+                    featureType == ASTLanguageV1.getASTNode() -> ClassName("com.strumenta.starlasulw", "StarlasuLWBaseASTNode")
+                    else -> TODO()
+                }
+                if (feature.isMultiple) {
+
+
+                    val prop = PropertySpec.builder(feature.name!!,
+                        ClassName("kotlin.collections", "MutableList")
+                            .parameterizedBy(baseType)
+                    )
+                    if (container is Concept) {
+                        prop.initializer(
+                            "multipleContainment<%T>(%S)",
+                            baseType,
+                            feature.name!!
+                        )
+                    }
+                    if (overridden) {
+                        prop.addModifiers(KModifier.OVERRIDE)
+                    }
+                    typeSpec.addProperty(prop.build())
+                } else {
+                    val prop = PropertySpec.builder(
+                        feature.name!!,
+                        baseType.copy(nullable = true)
+                    )
+                    if (container is Concept) {
+                        prop.delegate("singleContainment(%S)", feature.name!!)
+                    }
+                    if (overridden) {
+                        prop.addModifiers(KModifier.OVERRIDE)
+                    }
+                    typeSpec.addProperty(prop.build())
+                }
+            }
+        }
+    }
+
     private fun generateConcept(concept: Concept, languageType: ClassName) : FileSpec {
         val packageName = concept.language!!.name!!
-        val dynamicNode = ClassName("io.lionweb.model.impl", "DynamicNode")
         val baseNode = ClassName("io.lionweb.kotlin", "BaseNode")
         val conceptType = TypeSpec.classBuilder(concept.name!!)
-            .addModifiers(KModifier.PUBLIC)
+            .addModifiers(KModifier.PUBLIC, KModifier.OPEN)
         if (concept.isAbstract) {
             conceptType.addModifiers(KModifier.ABSTRACT)
         }
@@ -141,9 +269,12 @@ class ClassesGeneratorCommand : CliktCommand("classgen") {
                 interf == ASTLanguageV1.getPlaceholderElement() -> conceptType.addSuperinterface(ClassName("com.strumenta.starlasulw", "PlaceholderElementLW"))
                 interf == ASTLanguageV1.getEntityDeclaration() -> conceptType.addSuperinterface(ClassName("com.strumenta.starlasulw", "EntityDeclarationLW"))
                 interf == ASTLanguageV1.getDocumentation() -> conceptType.addSuperinterface(ClassName("com.strumenta.starlasulw", "DocumentationLW"))
-                interf == LionCoreBuiltins.getINamed(LionWebVersion.v2023_1)-> conceptType.addSuperinterface(ClassName("io.lionweb.language", "INamed"))
+                interf == LionCoreBuiltins.getINamed(LionWebVersion.v2023_1)-> conceptType.addSuperinterface(ClassName("com.strumenta.starlasulw", "NamedLW"))
                 interf == ASTLanguageV1.getTypeAnnotation() -> conceptType.addSuperinterface(ClassName("com.strumenta.starlasulw", "TypeAnnotationLW"))
                 else -> TODO()
+            }
+            interf.features.forEach { feature ->
+                generateFeature(conceptType, packageName, concept, feature, overridden = true)
             }
         }
 
@@ -155,86 +286,7 @@ class ClassesGeneratorCommand : CliktCommand("classgen") {
         conceptType.addFunction(getClassifierFun)
 
         concept.features.forEach { feature ->
-            when (feature) {
-                is Property -> {
-                    val featureType = feature.type!!
-                    val baseType : TypeName = when  {
-                        featureType.language == concept.language -> ClassName(packageName, featureType.name!!)
-                        featureType == LionCoreBuiltins.getString(LionWebVersion.v2023_1) -> ClassName("kotlin", "String")
-                        featureType == LionCoreBuiltins.getInteger(LionWebVersion.v2023_1) -> ClassName("kotlin", "Int")
-                        featureType == LionCoreBuiltins.getBoolean(LionWebVersion.v2023_1) -> ClassName("kotlin", "Boolean")
-                        featureType == ASTLanguageV1.getChar() -> ClassName("kotlin", "Char")
-                        else -> TODO()
-                    }
-                    val prop = PropertySpec.builder(
-                        feature.name!!,
-                        baseType.copy(nullable = true)
-                    )
-                        .delegate("property(%S)", feature.name!!)
-                        .build()
-                    conceptType.addProperty(prop)
-                }
-                is Reference -> {
-                    val featureType = feature.type!!
-                    val baseType : TypeName = when  {
-                        featureType.language == concept.language -> ClassName(packageName, featureType.name!!)
-                        featureType == LionCoreBuiltins.getINamed(LionWebVersion.v2023_1) -> ClassName("io.lionweb.kotlin", "Named")
-                        else -> TODO()
-                    }
-                    if (feature.isMultiple) {
-
-
-                        val prop = PropertySpec.builder(feature.name!!,
-                            ClassName("kotlin.collections", "MutableList")
-                                .parameterizedBy(baseType)
-                        )
-                            .initializer("multipleReference<%T>(%S)",
-                                baseType,
-                                feature.name!!
-                            )
-                            .build()
-                        conceptType.addProperty(prop)
-                    } else {
-                        val prop = PropertySpec.builder(
-                            feature.name!!,
-                            baseType.copy(nullable = true)
-                        )
-                            .delegate("singleReference(%S)", feature.name!!)
-                            .build()
-                        conceptType.addProperty(prop)
-                    }
-                }
-                is Containment -> {
-                    val featureType = feature.type!!
-                    val baseType : TypeName = when  {
-                        featureType.language == concept.language -> ClassName(packageName, featureType.name!!)
-                        featureType == ASTLanguageV1.getASTNode() -> ClassName("com.strumenta.starlasulw", "StarlasuLWBaseASTNode")
-                        else -> TODO()
-                    }
-                    if (feature.isMultiple) {
-
-
-                        val prop = PropertySpec.builder(feature.name!!,
-                            ClassName("kotlin.collections", "MutableList")
-                                .parameterizedBy(baseType)
-                        )
-                            .initializer("multipleContainment<%T>(%S)",
-                                baseType,
-                                feature.name!!
-                            )
-                            .build()
-                        conceptType.addProperty(prop)
-                    } else {
-                        val prop = PropertySpec.builder(
-                            feature.name!!,
-                            baseType.copy(nullable = true)
-                        )
-                            .delegate("singleContainment(%S)", feature.name!!)
-                            .build()
-                        conceptType.addProperty(prop)
-                    }
-                }
-            }
+            generateFeature(conceptType, packageName, concept, feature, overridden = false)
         }
 
         return FileSpec.builder(packageName, concept.name!!)
@@ -256,7 +308,7 @@ class ClassesGeneratorCommand : CliktCommand("classgen") {
                 superInterf == ASTLanguageV1.getPlaceholderElement() -> interfaceType.addSuperinterface(ClassName("com.strumenta.starlasulw", "PlaceholderElementLW"))
                 superInterf == ASTLanguageV1.getEntityDeclaration() -> interfaceType.addSuperinterface(ClassName("com.strumenta.starlasulw", "EntityDeclarationLW"))
                 superInterf == ASTLanguageV1.getDocumentation() -> interfaceType.addSuperinterface(ClassName("com.strumenta.starlasulw", "DocumentationLW"))
-                superInterf == LionCoreBuiltins.getINamed(LionWebVersion.v2023_1)-> interfaceType.addSuperinterface(ClassName("io.lionweb.language", "INamed"))
+                superInterf == LionCoreBuiltins.getINamed(LionWebVersion.v2023_1)-> interfaceType.addSuperinterface(ClassName("com.strumenta.starlasulw", "NamedLW"))
                 superInterf == ASTLanguageV1.getTypeAnnotation() -> interfaceType.addSuperinterface(ClassName("com.strumenta.starlasulw", "TypeAnnotationLW"))
                 else -> TODO()
             }
@@ -264,6 +316,11 @@ class ClassesGeneratorCommand : CliktCommand("classgen") {
         if (interf.extendedInterfaces.isEmpty()) {
             interfaceType.addSuperinterface(ClassName("io.lionweb.model", "Node"))
         }
+
+        interf.features.forEach { feature ->
+            generateFeature(interfaceType, packageName, interf, feature, overridden = false)
+        }
+
         return FileSpec.builder(packageName, interf.name!!)
             .addType(interfaceType.build())
             .build()
