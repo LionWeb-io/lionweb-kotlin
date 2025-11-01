@@ -101,18 +101,17 @@ class ClassesGeneratorCommand : CliktCommand("classgen") {
     private fun generateConcept(concept: Concept) : FileSpec {
         val dynamicNode = ClassName("io.lionweb.model.impl", "DynamicNode")
         val conceptType = TypeSpec.classBuilder(concept.name!!)
-            .superclass(dynamicNode)
             .addModifiers(KModifier.PUBLIC)
         if (concept.isAbstract) {
             conceptType.addModifiers(KModifier.ABSTRACT)
         }
         if (concept.extendedConcept != null) {
             when (val superConcept = concept.extendedConcept) {
-                ASTLanguageV1.getASTNode() -> TODO()
-                else -> TODO()
+                ASTLanguageV1.getASTNode() -> conceptType.superclass(ClassName("com.strumenta.starlasulw", "StarlasuLWBaseASTNode"))
+                else -> conceptType.superclass(dynamicNode)
             }
         }
-        concept.implemented.forEach { TODO() }
+        concept.implemented.forEach { /*TODO()*/ }
 
         return FileSpec.builder(concept.language!!.name!!, concept.name!!)
             .addType(conceptType.build())
