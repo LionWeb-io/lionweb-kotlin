@@ -212,10 +212,10 @@ class MetamodelRegistryImpl : MetamodelRegistry {
 
     override fun preparePrimitiveValuesSerialization(primitiveValuesSerialization: PrimitiveValuesSerialization) {
         serializers.forEach { primitiveType, serializer ->
-            primitiveValuesSerialization.registerSerializer(primitiveType.id, serializer)
+            primitiveValuesSerialization.registerSerializer(primitiveType.id!!, serializer)
         }
         deserializers.forEach { primitiveType, deserializer ->
-            primitiveValuesSerialization.registerDeserializer(primitiveType.id, deserializer)
+            primitiveValuesSerialization.registerDeserializer(primitiveType.id!!, deserializer)
         }
     }
 

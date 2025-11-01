@@ -1,6 +1,6 @@
 [versions]
 kotlinVersion="2.0.21"
-lwJavaVersion="1.1.4"
+lwJavaVersion="1.1.5-SNAPSHOT"
 kotestVersion="5.9.1"
 testcontainersVersion="1.21.3"
 starlasu-specs ="0.6.1"
