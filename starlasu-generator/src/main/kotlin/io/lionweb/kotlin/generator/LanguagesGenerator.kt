@@ -210,9 +210,56 @@ class LanguagesGeneratorCommand : CliktCommand("langgen") {
             sortedClassifiers.forEach { classifier ->
                 val varName = classifier.name!!.decapitalize()
 
-                if (!classifier.features.isEmpty()) {
+                //if (!classifier.features.isEmpty()) {
                     val populateMethod = FunSpec.builder("populate${classifier.name!!.capitalize()}")
                     val populateMethodCode = CodeBlock.builder()
+
+                    when (classifier) {
+                        is Concept -> {
+                            if (classifier.extendedConcept == null) {
+                                TODO()
+                            } else {
+                                if (classifier.extendedConcept == ASTLanguageV1.getASTNode()) {
+                                    populateMethodCode.addStatement("$varName.extendedConcept = %T.getASTNode()", ClassName("com.strumenta.starlasu.base.v1", "ASTLanguageV1"))
+                                } else {
+                                    TODO()
+                                }
+                            }
+                            classifier.implemented.forEach { implementedClassifier ->
+                                if (implementedClassifier == ASTLanguageV1.getExpression()) {
+                                    populateMethodCode.addStatement(
+                                        "$varName.extendedInterfaces.add(%T.getExpression())",
+                                        ClassName("com.strumenta.starlasu.base.v1", "ASTLanguageV1")
+                                    )
+                                } else if (implementedClassifier == ASTLanguageV1.getStatement()) {
+                                    populateMethodCode.addStatement(
+                                        "$varName.extendedInterfaces.add(%T.getStatement())",
+                                        ClassName("com.strumenta.starlasu.base.v1", "ASTLanguageV1")
+                                    )
+                                } else if (implementedClassifier == ASTLanguageV1.getParameter()) {
+                                    populateMethodCode.addStatement("$varName.extendedInterfaces.add(%T.getParameter())", ClassName("com.strumenta.starlasu.base.v1", "ASTLanguageV1"))
+                                } else if (implementedClassifier == ASTLanguageV1.getDocumentation()) {
+                                    populateMethodCode.addStatement("$varName.extendedInterfaces.add(%T.getDocumentation())", ClassName("com.strumenta.starlasu.base.v1", "ASTLanguageV1"))
+                                } else if (implementedClassifier == LionCoreBuiltins.getINamed(LionWebVersion.v2023_1)) {
+                                    populateMethodCode.addStatement(
+                                        "$varName.extendedInterfaces.add(%T.getINamed(LionWebVersion.v2023_1))",
+                                        ClassName("io.lionweb.language", "LionCoreBuiltins")
+                                    )
+                                } else {
+                                    TODO()
+                                }
+                            }
+                        }
+                        is Interface -> {
+                            classifier.extendedInterfaces.forEach {
+                                if (it == LionCoreBuiltins.getINamed(LionWebVersion.v2023_1)) {
+                                    populateMethodCode.addStatement("$varName.extendedInterfaces.add(%T.getINamed(LionWebVersion.v2023_1))", ClassName("io.lionweb.language", "LionCoreBuiltins"))
+                                } else {
+                                    TODO()
+                                }
+                            }
+                        }
+                    }
 
                     classifier.features.forEach { feature ->
                         when (feature) {
@@ -368,7 +415,7 @@ class LanguagesGeneratorCommand : CliktCommand("langgen") {
                     populateMethod.addCode(populateMethodCode.build())
                     langClassBuilder.addFunction(populateMethod.build())
                 }
-            }
+            //}
         }
 
     private fun save(fileSpec: FileSpec) {
