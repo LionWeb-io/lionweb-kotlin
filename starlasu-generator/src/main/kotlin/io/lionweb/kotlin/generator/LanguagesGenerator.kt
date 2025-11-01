@@ -10,6 +10,7 @@ import com.github.ajalt.clikt.parameters.types.file
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.FileSpec
+import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.TypeSpec
 import com.strumenta.starlasu.base.v1.ASTLanguageV1
 import io.lionweb.LionWebVersion
@@ -208,55 +209,87 @@ class LanguagesGeneratorCommand : CliktCommand("langgen") {
             val sortedClassifiers = sortTopologically(classifiers.toSet())
             sortedClassifiers.forEach { classifier ->
                 val varName = classifier.name!!.decapitalize()
-                classifier.features.forEach { feature ->
-                    when (feature) {
-                        is Property -> {
-                            if (feature.type!!.language == LionCoreBuiltins.getInstance(LionWebVersion.v2023_1)) {
-                                langInit.addStatement(
-                                    "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setType(%T.getInstance(LionWebVersion.v2023_1).getPrimitiveTypeByName(%S)))",
-                                    varName,
-                                    ClassName("io.lionweb.language", "Property"),
-                                    feature.id,
-                                    feature.key,
-                                    feature.name!!,
-                                    feature.isOptional,
-                                    ClassName("io.lionweb.language", "LionCoreBuiltins"),
-                                    feature.type!!.name!!
-                                )
-                            } else if (feature.type!!.language == ASTLanguageV1.getLanguage()) {
-                                langInit.addStatement(
-                                    "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setType(%T.getLanguage().getPrimitiveTypeByName(%S)))",
-                                    varName,
-                                    ClassName("io.lionweb.language", "Property"),
-                                    feature.id,
-                                    feature.key,
-                                    feature.name!!,
-                                    feature.isOptional,
-                                    ClassName("com.strumenta.starlasu.base.v1", "ASTLanguageV1"),
-                                    feature.type!!.name!!
-                                )
-                            } else {
-                                langInit.addStatement(
-                                    "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setType(%L))",
-                                    varName,
-                                    ClassName("io.lionweb.language", "Property"),
-                                    feature.id,
-                                    feature.key,
-                                    feature.name!!,
-                                    feature.isOptional,
-                                    feature.type!!.name!!.decapitalize()
-                                )
+
+                if (!classifier.features.isEmpty()) {
+                    val populateMethod = FunSpec.builder("populate${classifier.name!!.capitalize()}")
+                    val populateMethodCode = CodeBlock.builder()
+
+                    classifier.features.forEach { feature ->
+                        when (feature) {
+                            is Property -> {
+                                if (feature.type!!.language == LionCoreBuiltins.getInstance(LionWebVersion.v2023_1)) {
+                                    populateMethodCode.addStatement(
+                                        "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setType(%T.getInstance(LionWebVersion.v2023_1).getPrimitiveTypeByName(%S)))",
+                                        varName,
+                                        ClassName("io.lionweb.language", "Property"),
+                                        feature.id,
+                                        feature.key,
+                                        feature.name!!,
+                                        feature.isOptional,
+                                        ClassName("io.lionweb.language", "LionCoreBuiltins"),
+                                        feature.type!!.name!!
+                                    )
+                                } else if (feature.type!!.language == ASTLanguageV1.getLanguage()) {
+                                    populateMethodCode.addStatement(
+                                        "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setType(%T.getLanguage().getPrimitiveTypeByName(%S)))",
+                                        varName,
+                                        ClassName("io.lionweb.language", "Property"),
+                                        feature.id,
+                                        feature.key,
+                                        feature.name!!,
+                                        feature.isOptional,
+                                        ClassName("com.strumenta.starlasu.base.v1", "ASTLanguageV1"),
+                                        feature.type!!.name!!
+                                    )
+                                } else {
+                                    populateMethodCode.addStatement(
+                                        "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setType(%L))",
+                                        varName,
+                                        ClassName("io.lionweb.language", "Property"),
+                                        feature.id,
+                                        feature.key,
+                                        feature.name!!,
+                                        feature.isOptional,
+                                        feature.type!!.name!!.decapitalize()
+                                    )
+                                }
+
                             }
 
-                        }
-
-                        is Containment -> {
-                            if (feature.type!!.language == LionCoreBuiltins.getInstance(LionWebVersion.v2023_1)) {
-                                TODO()
-                            } else if (feature.type!!.language == ASTLanguageV1.getLanguage()) {
-                                if (feature.type is Concept) {
-                                    langInit.addStatement(
-                                        "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setMultiple(%L).setType(%T.getLanguage().getConceptByName(%S)))",
+                            is Containment -> {
+                                if (feature.type!!.language == LionCoreBuiltins.getInstance(LionWebVersion.v2023_1)) {
+                                    TODO()
+                                } else if (feature.type!!.language == ASTLanguageV1.getLanguage()) {
+                                    if (feature.type is Concept) {
+                                        populateMethodCode.addStatement(
+                                            "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setMultiple(%L).setType(%T.getLanguage().getConceptByName(%S)))",
+                                            varName,
+                                            ClassName("io.lionweb.language", "Containment"),
+                                            feature.id,
+                                            feature.key,
+                                            feature.name!!,
+                                            feature.isOptional,
+                                            feature.isMultiple,
+                                            ClassName("com.strumenta.starlasu.base.v1", "ASTLanguageV1"),
+                                            feature.type!!.name!!
+                                        )
+                                    } else {
+                                        populateMethodCode.addStatement(
+                                            "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setMultiple(%L).setType(%T.getLanguage().getInterfaceByName(%S)))",
+                                            varName,
+                                            ClassName("io.lionweb.language", "Containment"),
+                                            feature.id,
+                                            feature.key,
+                                            feature.name!!,
+                                            feature.isOptional,
+                                            feature.isMultiple,
+                                            ClassName("com.strumenta.starlasu.base.v1", "ASTLanguageV1"),
+                                            feature.type!!.name!!
+                                        )
+                                    }
+                                } else {
+                                    populateMethodCode.addStatement(
+                                        "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setMultiple(%L).setType(%L))",
                                         varName,
                                         ClassName("io.lionweb.language", "Containment"),
                                         feature.id,
@@ -264,43 +297,43 @@ class LanguagesGeneratorCommand : CliktCommand("langgen") {
                                         feature.name!!,
                                         feature.isOptional,
                                         feature.isMultiple,
-                                        ClassName("com.strumenta.starlasu.base.v1", "ASTLanguageV1"),
-                                        feature.type!!.name!!
-                                    )
-                                } else {
-                                    langInit.addStatement(
-                                        "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setMultiple(%L).setType(%T.getLanguage().getInterfaceByName(%S)))",
-                                        varName,
-                                        ClassName("io.lionweb.language", "Containment"),
-                                        feature.id,
-                                        feature.key,
-                                        feature.name!!,
-                                        feature.isOptional,
-                                        feature.isMultiple,
-                                        ClassName("com.strumenta.starlasu.base.v1", "ASTLanguageV1"),
-                                        feature.type!!.name!!
+                                        feature.type!!.name!!.decapitalize()
                                     )
                                 }
-                            } else {
-                                langInit.addStatement(
-                                    "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setMultiple(%L).setType(%L))",
-                                    varName,
-                                    ClassName("io.lionweb.language", "Containment"),
-                                    feature.id,
-                                    feature.key,
-                                    feature.name!!,
-                                    feature.isOptional,
-                                    feature.isMultiple,
-                                    feature.type!!.name!!.decapitalize()
-                                )
                             }
-                        }
 
-                        is Reference -> {
-                            if (feature.type!!.language == LionCoreBuiltins.getInstance(LionWebVersion.v2023_1)) {
-                                if (feature.type is Concept) {
-                                    langInit.addStatement(
-                                        "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setMultiple(%L).setType(%T.getInstance(LionWebVersion.v2023_1).getConceptByName(%S)))",
+                            is Reference -> {
+                                if (feature.type!!.language == LionCoreBuiltins.getInstance(LionWebVersion.v2023_1)) {
+                                    if (feature.type is Concept) {
+                                        populateMethodCode.addStatement(
+                                            "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setMultiple(%L).setType(%T.getInstance(LionWebVersion.v2023_1).getConceptByName(%S)))",
+                                            varName,
+                                            ClassName("io.lionweb.language", "Reference"),
+                                            feature.id,
+                                            feature.key,
+                                            feature.name!!,
+                                            feature.isOptional,
+                                            feature.isMultiple,
+                                            ClassName("io.lionweb.language", "LionCoreBuiltins"),
+                                            feature.type!!.name!!
+                                        )
+                                    } else {
+                                        populateMethodCode.addStatement(
+                                            "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setMultiple(%L).setType(%T.getInstance(LionWebVersion.v2023_1).getInterfaceByName(%S)))",
+                                            varName,
+                                            ClassName("io.lionweb.language", "Reference"),
+                                            feature.id,
+                                            feature.key,
+                                            feature.name!!,
+                                            feature.isOptional,
+                                            feature.isMultiple,
+                                            ClassName("io.lionweb.language", "LionCoreBuiltins"),
+                                            feature.type!!.name!!
+                                        )
+                                    }
+                                } else if (feature.type!!.language == ASTLanguageV1.getLanguage()) {
+                                    populateMethodCode.addStatement(
+                                        "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setMultiple(%L).setType(%T.getLanguage().%L(%S)))",
                                         varName,
                                         ClassName("io.lionweb.language", "Reference"),
                                         feature.id,
@@ -308,12 +341,13 @@ class LanguagesGeneratorCommand : CliktCommand("langgen") {
                                         feature.name!!,
                                         feature.isOptional,
                                         feature.isMultiple,
-                                        ClassName("io.lionweb.language", "LionCoreBuiltins"),
+                                        if (feature.type is Concept) "getConceptByName" else "getInterfaceByName",
+                                        ClassName("com.strumenta.starlasu.base.v1", "ASTLanguageV1"),
                                         feature.type!!.name!!
                                     )
                                 } else {
-                                    langInit.addStatement(
-                                        "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setMultiple(%L).setType(%T.getInstance(LionWebVersion.v2023_1).getInterfaceByName(%S)))",
+                                    populateMethodCode.addStatement(
+                                        "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setMultiple(%L).setType(%L))",
                                         varName,
                                         ClassName("io.lionweb.language", "Reference"),
                                         feature.id,
@@ -321,41 +355,18 @@ class LanguagesGeneratorCommand : CliktCommand("langgen") {
                                         feature.name!!,
                                         feature.isOptional,
                                         feature.isMultiple,
-                                        ClassName("io.lionweb.language", "LionCoreBuiltins"),
-                                        feature.type!!.name!!
+                                        feature.type!!.name!!.decapitalize()
                                     )
                                 }
-                            } else if (feature.type!!.language == ASTLanguageV1.getLanguage()) {
-                                langInit.addStatement(
-                                    "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setMultiple(%L).setType(%T.getLanguage().%L(%S)))",
-                                    varName,
-                                    ClassName("io.lionweb.language", "Reference"),
-                                    feature.id,
-                                    feature.key,
-                                    feature.name!!,
-                                    feature.isOptional,
-                                    feature.isMultiple,
-                                    if (feature.type is Concept) "getConceptByName" else "getInterfaceByName",
-                                    ClassName("com.strumenta.starlasu.base.v1", "ASTLanguageV1"),
-                                    feature.type!!.name!!
-                                )
-                            } else {
-                                langInit.addStatement(
-                                    "%L.addFeature(%T().setID(%S).setKey(%S).setName(%S).setOptional(%L).setMultiple(%L).setType(%L))",
-                                    varName,
-                                    ClassName("io.lionweb.language", "Reference"),
-                                    feature.id,
-                                    feature.key,
-                                    feature.name!!,
-                                    feature.isOptional,
-                                    feature.isMultiple,
-                                    feature.type!!.name!!.decapitalize()
-                                )
                             }
-                        }
 
-                        else -> TODO()
+                            else -> TODO()
+                        }
                     }
+
+                    langInit.addStatement("populate${classifier.name!!.capitalize()}()")
+                    populateMethod.addCode(populateMethodCode.build())
+                    langClassBuilder.addFunction(populateMethod.build())
                 }
             }
         }
